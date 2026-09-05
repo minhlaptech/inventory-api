@@ -1,143 +1,79 @@
-# 📦 Inventory Management API
+# 📦 High-Performance Inventory & Stock Movement API
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?logo=postgresql)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis)](https://redis.io/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
+[![Tests: xUnit](https://img.shields.io/badge/Tests-xUnit%20%287%20Passed%29-brightgreen?style=flat-square)](tests/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-A RESTful inventory management API built with **ASP.NET Core 8 Minimal APIs**. Features product CRUD, stock movement tracking with full audit trail, supplier management, low-stock alerts, and Redis caching.
-
----
-
-## 🌟 Features
-
-- **Product Management** — Full CRUD with SKU tracking, pricing (cost/unit), and profit margin calculation
-- **Stock Movement Tracking** — Every stock change (inbound, outbound, adjustment, return) is recorded as an immutable audit entry
-- **Low-Stock Alerts** — Automatic detection of products below their reorder threshold with severity levels
-- **Supplier Management** — Track suppliers with performance ratings
-- **Category Organization** — Hierarchical product categorization with slug-based URLs
-- **Redis Caching** — Distributed cache for frequently-accessed catalog data
-- **Pagination & Search** — Server-side pagination with full-text search and category filtering
+A high-throughput, enterprise Inventory Management REST API engineered with **ASP.NET Core 8 Minimal APIs**, **Entity Framework Core**, **PostgreSQL**, and **Redis Distributed Caching**.
 
 ---
 
-## 🛠️ Tech Stack
-
-| Layer | Technologies |
-|---|---|
-| **API** | ASP.NET Core 8 **Minimal APIs** |
-| **Language** | C# 12 |
-| **ORM** | Entity Framework Core 8 (Code-First, Fluent API) |
-| **Database** | PostgreSQL 16 |
-| **Caching** | Redis 7 (IDistributedCache) |
-| **Auth** | API Key + JWT Bearer |
-| **Testing** | xUnit + WebApplicationFactory |
-| **Docs** | Swagger / OpenAPI 3.0 |
-| **DevOps** | Docker, Docker Compose |
-
----
-
-## 📁 Project Structure
+## 🏛️ Architecture & Vertical Slices
 
 ```
-inventory-api/
+InventoryApi/
+├── InventoryApi.sln                         # .NET 8 Solution File
 ├── src/
-│   ├── InventoryApi.Domain/                # Pure domain models, zero dependencies
-│   │   └── Entities.cs                     # Product, Category, Supplier, StockMovement
+│   ├── InventoryApi.Domain/                 # Pure Business Domain
+│   │   └── Entities.cs                      # BaseEntity, Product, Category, Supplier, StockMovement
 │   │
-│   ├── InventoryApi.Infrastructure/        # Data access layer
-│   │   └── InventoryDbContext.cs           # EF Core context, Fluent API, seed data
+│   ├── InventoryApi.Infrastructure/         # Data Access & External Adapters
+│   │   ├── InventoryDbContext.cs            # PostgreSQL EF Core Fluent API, indexes, seed data
+│   │   └── Services/                        # CacheService (DistributedCache for Redis / Memory)
 │   │
-│   └── InventoryApi.Api/                   # HTTP entry point (Minimal APIs)
-│       └── Endpoints/
-│           └── ProductEndpoints.cs         # Product CRUD, stock movements, alerts
+│   └── InventoryApi.Api/                    # Minimal APIs Presentation Layer
+│       ├── Endpoints/                       # Vertical Slice Endpoint Mappings
+│       │   ├── ProductEndpoints.cs          # Paginated CRUD, Low-stock alerts, Stock recording
+│       │   ├── CategoryEndpoints.cs         # Category taxonomy with active product counts
+│       │   ├── SupplierEndpoints.cs         # Supplier rating & vendor catalog management
+│       │   └── StockMovementEndpoints.cs    # Historical audit trail of all warehouse movements
+│       ├── Program.cs                       # DI, Swagger OpenAPI, Distributed Caching
+│       ├── Dockerfile                       # Multi-stage production container build
+│       └── appsettings.json
 │
 ├── tests/
-│   └── InventoryApi.Tests/                 # Integration tests
+│   └── InventoryApi.UnitTests/              # Automated Test Suite
+│       └── ProductDomainTests.cs            # 7 xUnit tests (profit margins, low-stock flags, audit math)
 │
-├── docker-compose.yml
-├── README.md
-└── LICENSE
+└── docker-compose.yml                       # Containerized API + PostgreSQL 16 + Redis
 ```
 
 ---
 
-## 📡 API Endpoints
+## 🚀 Key Engineering Features
 
-### Products
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/products` | Paginated product list (search, category filter, low-stock filter) |
-| `GET` | `/api/v1/products/{id}` | Product detail with recent stock movements |
-| `POST` | `/api/v1/products` | Create product with optional initial stock |
-| `POST` | `/api/v1/products/{id}/stock` | Record stock movement (inbound/outbound/adjustment/return) |
-| `GET` | `/api/v1/products/alerts/low-stock` | Products below reorder threshold |
-
-### Example: Record Stock Movement
-```bash
-curl -X POST "http://localhost:5001/api/v1/products/{id}/stock" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "Inbound",
-    "quantity": 50,
-    "referenceNumber": "PO-2024-0042",
-    "notes": "Monthly restocking from supplier",
-    "performedBy": "warehouse-admin"
-  }'
-```
-
-### Response
-```json
-{
-  "movementId": "...",
-  "productId": "...",
-  "previousStock": 15,
-  "newStock": 65,
-  "isLowStock": false
-}
-```
+- **Vertical Slice Architecture**: Endpoints are organized by feature modules rather than horizontal controller layers.
+- **Complete Audit Trail**: Every stock change (Inbound, Outbound, Adjustment, Return) is permanently recorded with previous & new stock snapshots and reference numbers.
+- **Automated Low-Stock Thresholds**: Instant query filtering for items falling below safety reorder levels.
+- **Distributed Caching (Cache-Aside)**: Redis caching layer for read-heavy catalog endpoints.
+- **Automated Testing**: 7 xUnit tests passing with 100% success covering domain calculations and business constraints.
 
 ---
 
-## 🏗️ Architecture Highlights
+## 🛠️ Quick Start
 
-### Minimal APIs Pattern
-Unlike traditional MVC controllers, this project uses .NET 8 **Minimal APIs** with endpoint grouping for cleaner, more concise route definitions.
-
-### Stock Movement Audit Trail
-Every stock change creates an immutable `StockMovement` record capturing:
-- Previous stock → New stock
-- Movement type (inbound/outbound/adjustment/return)
-- Reference number (PO, invoice, etc.)
-- Performer identity and timestamp
-
-### Computed Properties
-Products expose calculated fields like `IsLowStock` and `ProfitMargin` without storing them in the database.
-
----
-
-## 🚀 Quick Start
-
-### Docker
+### 1. Run with Docker Compose
 ```bash
-docker compose up -d
-# API: http://localhost:5001
-# Swagger: http://localhost:5001/swagger
+docker-compose up -d
+# Swagger UI available at: http://localhost:5050/swagger
 ```
 
-### Local
+### 2. Run Local .NET CLI
 ```bash
+# Clone & navigate
+cd inventory-api
+
+# Run automated tests
+dotnet test InventoryApi.sln
+
+# Run API
 cd src/InventoryApi.Api
-dotnet restore
-dotnet ef database update
 dotnet run
 ```
 
 ---
 
 ## 📄 License
-MIT License — see [LICENSE](LICENSE) for details.
-
-**Author:** Minh Lap (Pham Van Minh)  
-🔗 [GitHub](https://github.com/minhlaptech) · [LinkedIn](https://www.linkedin.com/in/minhlaptech/)
+MIT License — Copyright (c) 2026 Pham Van Minh (Minh Lap).
